@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Showrunner's Second Brain"
+description = "An AI-powered continuity and narrative intelligence workspace for the Echoes of Tomorrow writers' room, with a dashboard, screenplay scene analysis workspace, and series bible."
+version = "1.0.0"
+id = "artifacts/showrunners-second-brain"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22469
+
+[services.development]
+run = "pnpm --filter @workspace/showrunners-second-brain run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/showrunners-second-brain", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/showrunners-second-brain/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22469"
+BASE_PATH = "/"
