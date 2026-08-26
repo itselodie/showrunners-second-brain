@@ -1,6 +1,6 @@
-# [Project name]
+# Showrunner's Second Brain
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An AI-powered continuity and narrative intelligence workspace for the writers' room of Echoes of Tomorrow.
 
 ## Run & Operate
 
@@ -10,6 +10,7 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Optional env: `GEMINI_API_KEY` — enables the real server-side scene analysis pass using Google Gemini
 
 ## Stack
 
@@ -22,15 +23,19 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/showrunners-second-brain/src/App.tsx` — dashboard, screenplay workspace, local Series Bible context, and analysis panel
+- `artifacts/api-server/src/routes/scene-analysis.ts` — provider-isolated Gemini analysis endpoint
+- `lib/api-spec/openapi.yaml` — source of truth for the scene-analysis request and response contract
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first version keeps screenplay and Series Bible demo data local so the product can be explored without account setup or a database.
+- Scene analysis is server-side; provider credentials never reach the browser, and the frontend only depends on the `/api/scene-analysis` contract.
+- Gemini is the current provider adapter because it can be enabled with one optional `GEMINI_API_KEY`; the UI never imports provider SDKs.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The product gives a television writers' room a dashboard, a screenplay workspace, and a structured series bible. The Analyze Scene action sends the current scene plus canon context to a real AI provider, which returns evidence-backed continuity findings and narrative repairs. Without `GEMINI_API_KEY`, the app reports that analysis is unavailable rather than showing fake output.
 
 ## User preferences
 

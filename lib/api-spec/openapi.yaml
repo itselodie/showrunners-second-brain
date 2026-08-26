@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: scene-analysis
+    description: AI-powered screenplay continuity analysis
 paths:
   /healthz:
     get:
@@ -24,6 +26,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /scene-analysis:
+    post:
+      operationId: analyzeScene
+      tags: [scene-analysis]
+      summary: Analyze a screenplay scene against the series bible
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneAnalysisInput"
+      responses:
+        "200":
+          description: Structured continuity analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneAnalysis"
+        "503":
+          description: AI provider is not configured or unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +59,103 @@ components:
           type: string
       required:
         - status
+    SceneAnalysisInput:
+      type: object
+      required:
+        - scene
+        - seriesBible
+      properties:
+        scene:
+          type: object
+          required: [episode, sceneNumber, lines]
+          properties:
+            episode:
+              type: string
+            sceneNumber:
+              type: number
+            lines:
+              type: array
+              items:
+                type: string
+        seriesBible:
+          type: object
+          required: [characters, locations, relationships, storyEvents, timeline]
+          properties:
+            characters:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            locations:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            relationships:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            storyEvents:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            timeline:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    SceneAnalysis:
+      type: object
+      required: [summary, findings, repairs, provider]
+      properties:
+        summary:
+          type: string
+        provider:
+          type: string
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/SceneFinding"
+        repairs:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/NarrativeRepair"
+    SceneFinding:
+      type: object
+      required: [title, severity, confidence, explanation, evidence]
+      properties:
+        title:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 100
+        explanation:
+          type: string
+        evidence:
+          type: array
+          items:
+            type: string
+    NarrativeRepair:
+      type: object
+      required: [title, description, tradeoff]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tradeoff:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
 

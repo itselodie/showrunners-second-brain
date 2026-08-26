@@ -1,0 +1,1 @@
+- [OpenAPI/Zod compatibility](openapi-zod-compatibility.md) — use numeric schemas rather than OpenAPI integer fields when this workspace's Zod v3 codegen emits unsupported z.int().
