@@ -4,7 +4,7 @@ import { AnalyzeSceneBody, AnalyzeSceneResponse } from "@workspace/api-zod";
 const router: IRouter = Router();
 
 const providerUrl = "https://generativelanguage.googleapis.com/v1beta/models";
-const defaultModel = "gemini-2.0-flash";
+const defaultModel = "gemini-2.5-flash";
 
 const analysisShape = {
   type: "OBJECT",
@@ -49,6 +49,7 @@ router.post("/scene-analysis", async (req, res) => {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    req.log.warn("Scene analysis requested but GEMINI_API_KEY is not configured in environment");
     res.status(503).json({
       error: "AI analysis is not configured yet. Add GEMINI_API_KEY to enable the continuity pass.",
     });
@@ -74,7 +75,10 @@ ${JSON.stringify(seriesBible, null, 2)}`;
       `${providerUrl}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -87,26 +91,86 @@ ${JSON.stringify(seriesBible, null, 2)}`;
     );
 
     if (!response.ok) {
-      res.status(503).json({ error: "The AI provider could not complete the continuity pass." });
+      let errorBody: unknown;
+      try {
+        errorBody = await response.json();
+      } catch {
+        try {
+          errorBody = await response.text();
+        } catch {
+          errorBody = "Failed to retrieve response body";
+        }
+      }
+
+      req.log.error(
+        {
+          status: response.status,
+          statusText: response.statusText,
+          model,
+          error: errorBody,
+        },
+        "Gemini API returned non-2xx status",
+      );
+
+      res.status(503).json({
+        error: "The AI provider could not complete the continuity pass.",
+      });
       return;
     }
 
     const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+        finishReason?: string;
+      }>;
+      promptFeedback?: unknown;
     };
     const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
+      req.log.error(
+        {
+          model,
+          payload,
+        },
+        "Gemini API returned an empty analysis or missing candidate text",
+      );
       res.status(503).json({ error: "The AI provider returned an empty analysis." });
       return;
     }
 
-    const output = AnalyzeSceneResponse.parse({
-      ...JSON.parse(text),
+    let parsedJson: Record<string, unknown>;
+    try {
+      const rawParsed = JSON.parse(text);
+      if (typeof rawParsed !== "object" || rawParsed === null || Array.isArray(rawParsed)) {
+        throw new Error("Parsed Gemini output is not a JSON object");
+      }
+      parsedJson = rawParsed as Record<string, unknown>;
+    } catch (parseError) {
+      req.log.error(
+        { err: parseError, rawText: text, model },
+        "Failed to parse Gemini output text as JSON object",
+      );
+      res.status(503).json({ error: "The AI provider returned an invalid continuity analysis." });
+      return;
+    }
+
+    const validated = AnalyzeSceneResponse.safeParse({
+      ...parsedJson,
       provider: "Google Gemini",
     });
-    res.json(output);
+
+    if (!validated.success) {
+      req.log.error(
+        { zodErrors: validated.error.format(), parsedJson, model },
+        "Gemini output failed validation against AnalyzeSceneResponse schema",
+      );
+      res.status(503).json({ error: "The AI provider returned an invalid continuity analysis." });
+      return;
+    }
+
+    res.json(validated.data);
   } catch (error) {
-    req.log.error({ err: error }, "Scene analysis failed");
+    req.log.error({ err: error }, "Unexpected error during scene analysis");
     res.status(503).json({ error: "The AI provider returned an invalid continuity analysis." });
   }
 });
